@@ -1,0 +1,26 @@
+{
+  "name": "highdim-causal-allocation-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "高维协变量调整与稳健资产配置实验平台 — 交互式蒙特卡洛因果推断与稳健配置实验室",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview --port 4173",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}
