@@ -34,6 +34,8 @@ export interface Dataset {
   Y1: number[];
   tau: number[];
   ateTrue: number;
+  /** 真实系数（beta 基线 / gamma 异质性），供样本外测试集共享同一总体 */
+  coef?: { beta: number[]; gamma: number[] | null };
 }
 
 export interface EstimatorResult {

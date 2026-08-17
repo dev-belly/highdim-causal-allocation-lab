@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from './rng';
-import { makeDataset } from './dgp';
-import { fitEstimator } from './estimators';
+import { makeDataset, generateCoef } from './dgp';
+import { fitEstimator, crossFittingDML } from './estimators';
 import { runTrial, aggregate } from './simulator';
 import { shaferStrimmerShrinkage, bayesSteinShrinkage } from './shrinkage';
-import { meanVarianceWeight } from './portfolio';
+import { meanVarianceWeight, evaluateAllocation } from './portfolio';
 import type { DGPParams, EstimatorName } from './types';
 
 const base: DGPParams = {
@@ -96,5 +96,47 @@ describe('均值-方差权重', () => {
     const w = meanVarianceWeight(5, 1, 1, false);
     expect(w).toBeLessThanOrEqual(1);
     expect(w).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('修复回归：交叉拟合 DML 在小样本 n < nFolds 不崩溃', () => {
+  it('n=3 时仍能返回有限结果', () => {
+    const small: DGPParams = { ...base, n: 3 };
+    const data = makeDataset(small, mulberry32(1));
+    const r = crossFittingDML(data.Y, data.W, data.X, 5);
+    expect(Number.isFinite(r.tau)).toBe(true);
+    expect(Number.isFinite(r.se)).toBe(true);
+  });
+});
+
+describe('修复回归：样本外测试集与训练集同总体', () => {
+  it('复用 coef 时测试集基线系数与训练集一致', () => {
+    const rng = mulberry32(99);
+    const data = makeDataset(base, rng);
+    const testRng = mulberry32(99 + 1_000_000);
+    const test = makeDataset(base, testRng, data.coef);
+    expect(data.coef!.beta).toEqual(test.coef!.beta);
+    expect(data.coef!.gamma).toEqual(test.coef!.gamma);
+  });
+
+  it('generateCoef 在 sparse 下仅前 5 个非零、linear 下生成 gamma', () => {
+    const c = generateCoef(mulberry32(5), 40, { ...base, sparse: true, heteroType: 'linear' });
+    const nz = c.beta.filter((x) => x !== 0).length;
+    expect(nz).toBe(5);
+    expect(c.gamma).not.toBeNull();
+  });
+});
+
+describe('修复回归：Bayes–Stein 收缩真正接入配置评估', () => {
+  it('大标准误时收缩后权重更接近先验均值（更保守）', () => {
+    const cfgHi = { riskAversion: 1, allowShort: false, priorVar: 1.0, priorMean: 0.0 };
+    const cfgLo = { riskAversion: 1, allowShort: false, priorVar: 100.0, priorMean: 0.0 };
+    const y1 = Array.from({ length: 200 }, (_, i) => 2 + (i % 2));
+    const y0 = Array.from({ length: 200 }, () => 0);
+    const oHi = evaluateAllocation(2, 1, 2.0, 1.0, y1, y0, cfgHi); // se 大 → 强收缩
+    const oLo = evaluateAllocation(2, 1, 2.0, 1.0, y1, y0, cfgLo); // priorVar 大 → 弱收缩
+    expect(Math.abs(oHi.wShrunk)).toBeLessThan(Math.abs(oLo.wShrunk));
+    // 收缩权重不应等于（不依赖真值的）oracle 混合
+    expect(oHi.wShrunk).not.toBeCloseTo(oHi.wStar, 6);
   });
 });

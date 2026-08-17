@@ -44,8 +44,9 @@ export function bayesSteinShrinkage(
   mu: number[],
   varMu: number[],
   tau2: number,
+  priorMean?: number,
 ): number[] {
-  const overall = mean(mu);
+  const overall = priorMean ?? mean(mu);
   return mu.map((m, i) => {
     const v = varMu[i] || 1e-12;
     const w = v / (v + tau2);

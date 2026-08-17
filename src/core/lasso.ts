@@ -58,11 +58,12 @@ export function lassoCV(X: number[][], y: number[], nFolds = 5): number {
   const n = X.length;
   const lambdas: number[] = [];
   for (let k = 0; k < 20; k++) lambdas.push(Math.pow(10, -3 + (k * 3) / 19));
-  const foldSize = Math.floor(n / nFolds);
+  const k = Math.max(1, Math.min(nFolds, n));
+  const foldSize = Math.max(1, Math.floor(n / k));
   const foldOf = new Array(n);
-  for (let i = 0; i < n; i++) foldOf[i] = Math.floor(i / foldSize) % nFolds;
+  for (let i = 0; i < n; i++) foldOf[i] = Math.floor(i / foldSize) % k;
   const cvErr = new Array(lambdas.length).fill(0);
-  for (let f = 0; f < nFolds; f++) {
+  for (let f = 0; f < k; f++) {
     const trainIdx: number[] = [];
     const valIdx: number[] = [];
     for (let i = 0; i < n; i++) (foldOf[i] === f ? valIdx : trainIdx).push(i);

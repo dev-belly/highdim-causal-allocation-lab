@@ -1,7 +1,9 @@
 // 稳健资产配置：将 ATE 估计误差映射到均值-方差最优权重偏移与样本外风险
-// 并提供“收缩基准”（Bayes–Stein 风格向真实最优权重收缩）以对比无约束估计
+// 并提供“收缩基准”：用真实、数据驱动的 Bayes–Stein 收缩将估计 ATE 向先验均值收缩，
+// 以对比“无约束（直接用估计 ATE）”与“收缩后”的样本外表现。
 
 import { mean, std, variance } from './linalg';
+import { bayesSteinShrinkage } from './shrinkage';
 
 /** 单期均值-方差最优权重（风险资产 vs 无风险基准） */
 export function meanVarianceWeight(
@@ -30,30 +32,43 @@ export interface PortfolioOutcome {
 export interface AllocationConfig {
   riskAversion: number;
   allowShort: boolean;
-  shrinkageIntensity: number; // 收缩基准的收缩强度（0=无约束，1=完全用理论权重）
+  /** Bayes–Stein 先验方差：越大 → 收缩越弱（更信任估计值） */
+  priorVar: number;
+  /** 先验均值：单资产设定下向无风险/零超额收益收缩 */
+  priorMean: number;
 }
 
 /**
  * 评估一次试验的资产配置表现。
  * @param tauHat 估计的 ATE
- * @param tauTrue 真实 ATE
- * @param sigma2True 收益方差（真实/样本）
+ * @param tauTrue 真实 ATE（仅用于计算 oracle 参考 wStar / 效用损失，不用于收缩）
+ * @param seHat 估计 ATE 的标准误（驱动数据驱动的收缩强度）
+ * @param sigma2True 风险资产（处理组）收益方差
  * @param testY1 独立测试集：处理组结果
  * @param testY0 独立测试集：对照组结果
  */
 export function evaluateAllocation(
   tauHat: number,
   tauTrue: number,
+  seHat: number,
   sigma2True: number,
   testY1: number[],
   testY0: number[],
   cfg: AllocationConfig,
 ): PortfolioOutcome {
-  const { riskAversion, allowShort, shrinkageIntensity } = cfg;
+  const { riskAversion, allowShort, priorVar, priorMean } = cfg;
   const wStar = meanVarianceWeight(tauTrue, sigma2True, riskAversion, allowShort);
   const wHat = meanVarianceWeight(tauHat, sigma2True, riskAversion, allowShort);
-  const wShrunk =
-    (1 - shrinkageIntensity) * wHat + shrinkageIntensity * wStar;
+
+  // 数据驱动的 Bayes–Stein 收缩：将估计 ATE 向先验均值收缩，
+  // 收缩强度由估计方差 se^2 与先验方差 priorVar 之比决定（不依赖真值）。
+  const tauShrunk = bayesSteinShrinkage(
+    [tauHat],
+    [seHat * seHat],
+    priorVar,
+    priorMean,
+  )[0];
+  const wShrunk = meanVarianceWeight(tauShrunk, sigma2True, riskAversion, allowShort);
 
   const weightBias = wHat - wStar;
   const weightAbsErr = Math.abs(weightBias);

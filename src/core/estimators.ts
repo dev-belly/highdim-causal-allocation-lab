@@ -104,9 +104,10 @@ export function crossFittingDML(
   fixedLambda: number | null = null,
 ): EstimatorResult {
   const n = Y.length;
-  const foldSize = Math.floor(n / nFolds);
-  const folds: number[][] = Array.from({ length: nFolds }, () => []);
-  for (let i = 0; i < n; i++) folds[Math.floor(i / foldSize) % nFolds].push(i);
+  const k = Math.max(1, Math.min(nFolds, n));
+  const foldSize = Math.max(1, Math.floor(n / k));
+  const folds: number[][] = Array.from({ length: k }, () => []);
+  for (let i = 0; i < n; i++) folds[Math.floor(i / foldSize) % k].push(i);
   const mHat = new Array(n).fill(0);
   const lambda = fixedLambda ?? lassoCV(X, Y);
   for (const valIdx of folds) {

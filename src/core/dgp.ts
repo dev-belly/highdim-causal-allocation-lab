@@ -97,38 +97,52 @@ export function assignTreatment(
   return W;
 }
 
-/** 生成潜在结果与观测结果 */
-export function generateOutcomes(
+/** 生成真实系数（基线 beta 与异质性 gamma），供训练集与测试集共享，
+ * 保证“样本外”评估来自同一总体（同一组真实系数）。 */
+export function generateCoef(
   rng: RNG,
-  X: number[][],
-  W: number[],
+  p: number,
   params: DGPParams,
-): { Y: number[]; Y0: number[]; Y1: number[]; tau: number[] } {
-  const n = X.length;
-  const p = X[0].length;
+): { beta: number[]; gamma: number[] | null } {
   let beta: number[];
   if (params.sparse) {
     const s = Math.max(1, Math.min(p, 5));
     beta = new Array(p).fill(0);
     for (let j = 0; j < s; j++) beta[j] = gaussian(rng);
   } else {
-    beta = X[0].map(() => gaussian(rng) * 0.5);
+    beta = new Array(p).fill(0).map(() => gaussian(rng) * 0.5);
   }
+  let gamma: number[] | null = null;
+  if (params.heteroType === 'linear') {
+    if (params.sparse) {
+      const s = Math.max(1, Math.min(p, 5));
+      gamma = new Array(p).fill(0);
+      for (let j = 0; j < s; j++) gamma[j] = gaussian(rng);
+    } else {
+      gamma = new Array(p).fill(0).map(() => gaussian(rng) * 0.5);
+    }
+  }
+  return { beta, gamma };
+}
+
+/** 生成潜在结果与观测结果（使用给定的真实系数 coef） */
+export function generateOutcomes(
+  rng: RNG,
+  X: number[][],
+  W: number[],
+  params: DGPParams,
+  coef: { beta: number[]; gamma: number[] | null },
+): { Y: number[]; Y0: number[]; Y1: number[]; tau: number[] } {
+  const n = X.length;
+  const { beta, gamma } = coef;
   const baseline = X.map((r) => r.reduce((acc, v, j) => acc + v * beta[j], 0));
 
   let tau: number[];
   if (params.heteroType === 'homogeneous') {
     tau = new Array(n).fill(params.ate);
   } else if (params.heteroType === 'linear') {
-    let gamma: number[];
-    if (params.sparse) {
-      const s = Math.max(1, Math.min(p, 5));
-      gamma = new Array(p).fill(0);
-      for (let j = 0; j < s; j++) gamma[j] = gaussian(rng);
-    } else {
-      gamma = X[0].map(() => gaussian(rng) * 0.5);
-    }
-    const raw = X.map((r) => r.reduce((acc, v, j) => acc + v * gamma[j], 0));
+    const g = gamma as number[];
+    const raw = X.map((r) => r.reduce((acc, v, j) => acc + v * g[j], 0));
     const m = mean(raw);
     const sd = std(raw) || 1;
     tau = raw.map((v) => params.ate + (params.heteroStrength * (v - m)) / sd);
@@ -145,8 +159,12 @@ export function generateOutcomes(
   return { Y, Y0, Y1, tau };
 }
 
-/** 生成一次完整模拟数据 */
-export function makeDataset(params: DGPParams, rng: RNG): Dataset {
+/** 生成一次完整模拟数据；若传入 coef 则复用（保证样本外评估的同总体性） */
+export function makeDataset(
+  params: DGPParams,
+  rng: RNG,
+  coef?: { beta: number[]; gamma: number[] | null },
+): Dataset {
   const X = generateCovariates(
     rng,
     params.n,
@@ -157,6 +175,7 @@ export function makeDataset(params: DGPParams, rng: RNG): Dataset {
   );
   const strata = generateStrata(rng, X, params.nStrata);
   const W = assignTreatment(rng, strata, params.treatProb, params.assignment);
-  const { Y, Y0, Y1, tau } = generateOutcomes(rng, X, W, params);
-  return { X, W, Y, strata, Y0, Y1, tau, ateTrue: params.ate };
+  const c = coef ?? generateCoef(rng, params.p, params);
+  const { Y, Y0, Y1, tau } = generateOutcomes(rng, X, W, params, c);
+  return { X, W, Y, strata, Y0, Y1, tau, ateTrue: params.ate, coef: c };
 }

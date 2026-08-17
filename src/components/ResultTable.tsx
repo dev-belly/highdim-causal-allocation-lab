@@ -77,8 +77,8 @@ export function ResultTable({ results, estimators }: Props) {
           </table>
         </div>
         <div className="note">
-          覆盖率基于 95% 名义水平；收缩 Sharpe 为 Bayes–Stein 风格向理论最优权重收缩后的样本外夏普，
-          体现“收缩基准 vs 无约束基准”的稳健性改善。
+          覆盖率基于 95% 名义水平；收缩 Sharpe 为对估计 ATE 做数据驱动 Bayes–Stein 收缩（向零/无风险收缩，
+          强度由估计标准误决定，不使用真值）后的样本外夏普，体现“收缩基准 vs 无约束基准”的稳健性改善。
         </div>
       </div>
 

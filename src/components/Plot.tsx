@@ -63,7 +63,15 @@ export function Plot({ data, layout, className }: PlotProps) {
         }
         return;
       }
-      const mergedLayout = { ...baseLayout, ...layout };
+      // 深合并：图表级 xaxis/yaxis/scene 不应覆盖基础深色网格与坐标轴配色
+      const ov = (layout ?? {}) as Record<string, any>;
+      const mergedLayout: Record<string, unknown> = {
+        ...baseLayout,
+        ...layout,
+        xaxis: { ...(baseLayout.xaxis as Record<string, any>), ...(ov.xaxis || {}) },
+        yaxis: { ...(baseLayout.yaxis as Record<string, any>), ...(ov.yaxis || {}) },
+      };
+      if (ov.scene) mergedLayout.scene = { bgcolor: 'rgba(0,0,0,0)', ...ov.scene };
       if (!plotted.current) {
         void P.newPlot(el, data, mergedLayout, CONFIG);
         plotted.current = true;

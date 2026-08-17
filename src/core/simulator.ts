@@ -5,7 +5,7 @@ import { mulberry32 } from './rng';
 import { makeDataset } from './dgp';
 import { fitEstimator } from './estimators';
 import { evaluateAllocation } from './portfolio';
-import { confidenceInterval, mean, std } from './linalg';
+import { confidenceInterval, mean, std, variance } from './linalg';
 import type {
   DGPParams,
   EstimatorName,
@@ -16,7 +16,8 @@ import type {
 const DEFAULT_ALLOC = {
   riskAversion: 1,
   allowShort: false,
-  shrinkageIntensity: 0.3,
+  priorVar: 1.0,
+  priorMean: 0.0,
 };
 
 /** 运行一次试验：返回每个估计量的指标（含独立测试集的样本外评估） */
@@ -27,9 +28,11 @@ export function runTrial(
 ): TrialMetric[] {
   const rng = mulberry32(seed);
   const data = makeDataset(params, rng);
+  // 样本外测试集复用同一组真实系数（同总体），仅重新抽取协变量/处理/噪声
   const testRng = mulberry32(seed + 1_000_000);
-  const test = makeDataset(params, testRng);
-  const sigma2 = std(data.Y) ** 2 || 1e-6;
+  const test = makeDataset(params, testRng, data.coef);
+  // 风险资产（处理组）收益方差
+  const sigma2 = variance(data.Y1) || 1e-6;
 
   const out: TrialMetric[] = [];
   for (const name of estimators) {
@@ -37,6 +40,7 @@ export function runTrial(
     const pf = evaluateAllocation(
       res.tau,
       params.ate,
+      res.se,
       sigma2,
       test.Y1,
       test.Y0,
