@@ -48,7 +48,8 @@
 - **Web Worker 并行蒙特卡洛引擎** — 模拟脱离 UI 主线程，逐单元回传进度
 - **Plotly.js（CDN 加载）** — 专业金融图表：覆盖率折线、RMSE 热力图、权重误差曲线、**RMSE 3D 曲面**
 - **Vitest** — 覆盖 DGP 可复现性、估计量有限性、覆盖率、高维 RMSE、收缩估计、权重截断的单元测试
-- **GitHub Actions CI/CD** — 推送即构建并部署到 GitHub Pages
+- **GitHub Pages 部署（gh-pages 分支）** — 构建产物使用相对路径（`base: './'`），可部署在任意子路径
+- *（可选增强）* 仓库内置 `.github/workflows/deploy.yml` 的 Actions 自动部署方案，启用需在 `gh` 令牌上追加 `workflow` 权限
 - **纯函数数值内核**（无第三方数值库）：mulberry32 可复现 PRNG、Box–Muller 高斯、Cholesky 分解、高斯消元/求逆、Acklam 正态分位数近似、坐标下降 Lasso
 
 > 工程规范、配置方法论与量化把关参考了 **ModernWebappExpert · EquityResearchExpert · TradingAgentTeam** 的方法论。
@@ -116,10 +117,26 @@ python -m src.experiment          # 运行主实验，输出表格/图表/report
 
 ## 部署（GitHub Pages）
 
-仓库已配置 `.github/workflows/deploy.yml`：推送 `main` 分支即自动 **构建 → 上传产物 → 部署到 GitHub Pages**。
+采用 **gh-pages 分支** 方式发布（当前 `gh` 令牌仅含 `repo` 权限，无需 `workflow` 作用域）：
 
-- 构建产物使用相对路径（`base: './'`），可部署在任意子路径。
-- Pages 源设为 **GitHub Actions**（由 `actions/deploy-pages` 发布），无需维护 `gh-pages` 分支。
+```bash
+# 1. 构建生产产物到 dist/
+npm run build
+
+# 2. 将 dist/ 发布到 gh-pages 分支（推荐用 git worktree，避免污染主分支）
+git worktree add -b gh-pages ../ghpages-deploy
+cp -r dist/* ../ghpages-deploy/
+cd ../ghpages-deploy
+git add -A && git commit -m "deploy: GitHub Pages"
+git push origin gh-pages
+git worktree remove ../ghpages-deploy
+```
+
+随后在仓库 **Settings → Pages** 将源设为 `gh-pages` 分支（`/`）即可。
+构建产物使用相对路径（`base: './'`），无需担心子路径问题。
+
+> 若希望“推送 `main` 即自动部署”，仓库根目录的 `.github/workflows/deploy.yml` 已写好完整流水线；
+> 只需为 `gh` 令牌追加 `workflow` 作用域（`gh auth refresh -s workflow`）并将该文件纳入提交即可启用。
 
 ---
 
