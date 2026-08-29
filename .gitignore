@@ -1,0 +1,66 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist-info/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 注意：仓库根目录的 dist/ 与 assets/ 是 GitHub Pages 的构建产物，需要跟踪，
+# 因此这里只忽略 Python 打包产生的 dist，不影响前端产物。
+
+# ---- 虚拟环境 ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- Node / 前端依赖 ----
+node_modules/
+npm-debug.log*
+yarn-error.log
+.pnpm-debug.log
+install.log
+
+# ---- 测试与覆盖率 ----
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- 实验输出（本地跑出来的结果不入库）----
+python/output/
+python/outputs/
+output/
+outputs/
+*.png
+*.pdf
+!assets/*.png
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

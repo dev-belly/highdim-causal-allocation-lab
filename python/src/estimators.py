@@ -8,7 +8,8 @@ ATE 估计量实现
 """
 
 import numpy as np
-from sklearn.linear_model import Lasso, LassoCV, Ridge
+from sklearn.linear_model import Lasso, LassoCV
+from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from scipy import stats
 
@@ -61,11 +62,16 @@ class LassoAdjusted:
         Y_i - m(X_i) = tau * (W_i - e(X_i)) + eps_i
     其中 m(X) 与 e(X) 分别用 Lasso 回归 Y 与 W 得到。
     若用户未提供倾向得分 e(X)，默认使用常数处理概率。
+
+    注意：本估计量不做交叉拟合，m_hat 在全部样本上拟合，
+    因此在高维情形下的置信区间可能有轻微覆盖不足（欠覆盖）。
+    需要严格推断时请使用 CrossFittingDML。
     """
 
-    def __init__(self, alpha=None, standardize=True):
+    def __init__(self, alpha=None, standardize=True, random_state=42):
         self.alpha = alpha
         self.standardize = standardize
+        self.random_state = random_state
 
     def fit(self, Y, W, X):
         n, p = X.shape
@@ -74,12 +80,12 @@ class LassoAdjusted:
 
         # 选择 Lasso 正则化参数
         if self.alpha is None:
-            model_y = LassoCV(cv=5, random_state=42, max_iter=10000).fit(Xs, Y)
+            model_y = LassoCV(cv=5, random_state=self.random_state, max_iter=50000).fit(Xs, Y)
             alpha_y = model_y.alpha_
         else:
             alpha_y = self.alpha
 
-        lasso_y = Lasso(alpha=alpha_y, max_iter=10000).fit(Xs, Y)
+        lasso_y = Lasso(alpha=alpha_y, max_iter=50000).fit(Xs, Y)
         m_hat = lasso_y.predict(Xs)
 
         # 倾向得分：这里默认完全/分层随机，使用样本均值
@@ -102,38 +108,61 @@ class CrossFittingDML:
     交叉拟合 Double Machine Learning（K 折）， nuisance 函数使用 Lasso。
 
     模型：Y - m(X) = tau * (W - e(X)) + eps
+
+    实现要点
+    --------
+    1. **折内样本对齐**：折划分由 ``KFold(shuffle=True, random_state=...)`` 生成，
+       返回的验证折索引恒为升序，因此 ``X_val`` 的行序与 ``val_idx`` 严格对应。
+       早期版本用 ``np.random.shuffle`` + ``np.array_split`` 产生乱序折索引，
+       却用布尔掩码 ``X[~train_mask]``（升序）取验证行，导致预测值被错配到
+       无关样本上，tau 估计严重失真。
+    2. **标准化无泄漏**：每折的 StandardScaler 仅在该折的训练部分拟合。
+    3. **可复现**：折划分受 ``random_state`` 控制，不再依赖全局随机状态。
+    4. 在随机试验设定下倾向得分真实已知，故使用常数 ``e(X) = mean(W)``，
+       这比估计倾向得分更有效（Chernozhukov et al., 2018, §3）。
     """
 
-    def __init__(self, n_folds=5, alpha=None, standardize=True):
+    def __init__(self, n_folds=5, alpha=None, standardize=True, random_state=42):
+        if n_folds < 2:
+            raise ValueError("n_folds must be >= 2 for cross-fitting")
         self.n_folds = n_folds
         self.alpha = alpha
         self.standardize = standardize
+        self.random_state = random_state
 
     def fit(self, Y, W, X):
         n, p = X.shape
-        scaler = StandardScaler()
-        Xs = scaler.fit_transform(X) if self.standardize else X
-
-        indices = np.arange(n)
-        np.random.shuffle(indices)
-        folds = np.array_split(indices, self.n_folds)
+        if n < self.n_folds:
+            raise ValueError(f"n={n} is smaller than n_folds={self.n_folds}")
 
         m_hat = np.zeros(n)
-        e_hat = np.full(n, W.mean())  # 默认常数倾向得分
+        e_hat = np.full(n, W.mean())  # 随机试验下倾向得分已知，使用常数
 
-        for fold_idx, val_idx in enumerate(folds):
-            train_mask = np.ones(n, dtype=bool)
-            train_mask[val_idx] = False
-            X_train, Y_train = Xs[train_mask], Y[train_mask]
-            X_val = Xs[val_mask := ~train_mask]
+        splitter = KFold(
+            n_splits=self.n_folds, shuffle=True, random_state=self.random_state
+        )
+
+        for val_idx, train_idx in splitter.split(X):
+            if self.standardize:
+                scaler = StandardScaler()
+                X_train = scaler.fit_transform(X[train_idx])
+                X_val = scaler.transform(X[val_idx])
+            else:
+                X_train, X_val = X[train_idx], X[val_idx]
+            Y_train = Y[train_idx]
 
             if self.alpha is None:
-                model_y = LassoCV(cv=min(3, len(Y_train)), random_state=42, max_iter=10000).fit(X_train, Y_train)
+                # 折内 CV 折数受可用样本量约束，避免小样本下退化
+                inner_cv = min(5, max(2, len(Y_train) // 10))
+                model_y = LassoCV(
+                    cv=inner_cv, random_state=self.random_state, max_iter=50000
+                ).fit(X_train, Y_train)
                 alpha_y = model_y.alpha_
             else:
                 alpha_y = self.alpha
 
-            lasso_y = Lasso(alpha=alpha_y, max_iter=10000).fit(X_train, Y_train)
+            lasso_y = Lasso(alpha=alpha_y, max_iter=50000).fit(X_train, Y_train)
+            # val_idx 与 X_val 行序一致（KFold 保证升序），可安全对齐赋值
             m_hat[val_idx] = lasso_y.predict(X_val)
 
         pseudo = (Y - m_hat) / (W - e_hat)
