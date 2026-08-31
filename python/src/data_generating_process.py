@@ -10,7 +10,6 @@
 """
 
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder
 
 
 def generate_covariates(n, p, corr_type="independent", rho=0.5, block_size=None, rng=None):

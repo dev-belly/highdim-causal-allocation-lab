@@ -9,23 +9,17 @@
 """
 
 import os
-import sys
-import json
-import yaml
+from itertools import product
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-from itertools import product
+import yaml
 from joblib import Parallel, delayed
 
-# 确保从项目根目录导入
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
 from src.data_generating_process import make_dataset
-from src.estimators import ESTIMATORS, fit_estimator
+from src.estimators import fit_estimator
 from src.evaluation import aggregate_results
 from src.portfolio import map_ate_error_to_portfolio
 

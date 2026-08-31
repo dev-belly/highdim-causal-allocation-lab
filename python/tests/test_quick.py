@@ -8,6 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import src.estimators as estimators_module  # noqa: E402
 from src.data_generating_process import make_dataset  # noqa: E402
 from src.estimators import fit_estimator  # noqa: E402
 from src.evaluation import aggregate_results  # noqa: E402
@@ -84,6 +85,27 @@ def test_cross_fitting_is_reproducible():
     first = fit_estimator("cross_fitting_dml", data["Y"], data["W"], data["X"])
     second = fit_estimator("cross_fitting_dml", data["Y"], data["W"], data["X"])
     assert first["tau"] == pytest.approx(second["tau"], abs=0, rel=0)
+
+
+def test_cross_fitting_trains_on_k_minus_one_folds(monkeypatch):
+    """KFold 返回 train、validation；不能把两组索引反向解包。"""
+    train_sizes = []
+
+    class RecordingScaler:
+        def fit_transform(self, values):
+            train_sizes.append(len(values))
+            return np.asarray(values)
+
+        def transform(self, values):
+            return np.asarray(values)
+
+    monkeypatch.setattr(estimators_module, "StandardScaler", RecordingScaler)
+    data = make_dataset(**dict(BASE_DGP, n=50), rng=np.random.default_rng(77))
+    estimator = estimators_module.CrossFittingDML(n_folds=5, alpha=0.05)
+    result = estimator.fit(data["Y"], data["W"], data["X"])
+
+    assert train_sizes == [40] * 5
+    assert np.isfinite(result["tau"])
 
 
 def test_cross_fitting_respects_fold_alignment():

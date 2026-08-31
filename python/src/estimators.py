@@ -8,10 +8,10 @@ ATE 估计量实现
 """
 
 import numpy as np
+from scipy import stats
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
-from scipy import stats
 
 
 def _add_intercept(X):
@@ -22,7 +22,6 @@ class DifferenceInMeans:
     """简单差分均值估计量（无协变量调整）。"""
 
     def fit(self, Y, W, X=None):
-        n = len(Y)
         mu1 = Y[W == 1].mean()
         mu0 = Y[W == 0].mean()
         tau_hat = mu1 - mu0
@@ -142,7 +141,10 @@ class CrossFittingDML:
             n_splits=self.n_folds, shuffle=True, random_state=self.random_state
         )
 
-        for val_idx, train_idx in splitter.split(X):
+        # scikit-learn yields (train_indices, validation_indices).  Reversing
+        # these makes every nuisance model train on only one fold and predict
+        # the remaining K-1 folds, defeating cross-fitting and distorting ATE.
+        for train_idx, val_idx in splitter.split(X):
             if self.standardize:
                 scaler = StandardScaler()
                 X_train = scaler.fit_transform(X[train_idx])

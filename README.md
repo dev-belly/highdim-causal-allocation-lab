@@ -31,7 +31,8 @@
 2. **误差如何传导？** ATE 的估计误差不是终点。项目把它映射为均值-方差最优权重，
    再用 **Bayes-Stein 收缩**修正，量化"估计误差 → 权重偏移 → 样本外夏普比率损失"这条链路。
 3. **可复现与可验证。** 全部随机性由显式 `random_state` / `default_rng(seed)` 控制，
-   CI 在 Python 3.10 / 3.12 上跑回归测试，包含一条锁定历史 bug 的专项测试。
+   CI 同时执行前端单测、构建与依赖审计，并在 Python 3.10 / 3.12 上跑回归测试，
+   包含锁定历史交叉拟合 bug 的专项测试。
 
 ---
 
@@ -128,6 +129,11 @@ for val_idx in folds:               # val_idx 是乱序的，例如 [4, 3]
 **修复**：改用 `KFold(shuffle=True, random_state=...)`，它返回的验证折索引恒为升序，
 行序与赋值位置严格对齐；同时把标准化改为每折在训练部分拟合，消除数据泄漏。
 
+后续审查还发现一次清理提交把 scikit-learn 返回的 `(train_idx, val_idx)` 反向解包，
+导致每折只用 1/K 样本训练、却预测其余 K−1 折。实现现已恢复正确顺序，并用
+`test_cross_fitting_trains_on_k_minus_one_folds` 明确锁定每折训练样本数，避免仅靠宽松的
+统计阈值漏掉同类回归。
+
 修复前后对比（RMSE，40 次重复）：
 
 | 配置 | 修复前 | 修复后 | 改善 |
@@ -144,8 +150,19 @@ for val_idx in folds:               # val_idx 是乱序的，例如 [4, 3]
 
 ## 快速开始
 
+交互式前端：
+
 ```bash
 git clone https://github.com/dev-belly/highdim-causal-allocation-lab.git
+cd highdim-causal-allocation-lab
+npm ci
+npm test
+npm run dev
+```
+
+Python 实验：
+
+```bash
 cd highdim-causal-allocation-lab/python
 
 python -m venv .venv && source .venv/bin/activate
@@ -193,9 +210,10 @@ print(f"tau = {res['tau']:.4f}  (se = {res['se']:.4f})")
 
 ```text
 highdim-causal-allocation-lab/
-├── index.html                # 交互式实验室入口（GitHub Pages）
-├── assets/                   # 前端构建产物
-├── dist/                     # 前端构建产物
+├── src/                      # React 交互实验室、Web Worker 与 TypeScript 核心算法
+├── index.html                # Vite 开发/构建入口
+├── package.json              # 前端测试与构建命令
+├── dist/                     # 可部署到 GitHub Pages 的前端构建产物
 ├── python/
 │   ├── config/default.yaml   # 参数网格与估计量配置
 │   ├── src/

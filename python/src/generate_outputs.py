@@ -3,18 +3,14 @@
 """
 
 import os
-import sys
+
 import pandas as pd
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
 from src.experiment import (
+    generate_report,
     plot_coverage_vs_sample_size,
     plot_rmse_heatmap,
     plot_weight_bias,
-    generate_report,
 )
 
 if __name__ == "__main__":
