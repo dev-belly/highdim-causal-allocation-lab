@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from './rng';
 import { makeDataset, generateCoef } from './dgp';
-import { fitEstimator, crossFittingDML } from './estimators';
+import { fitEstimator, crossFittingDML, crossFittedOutcomePredictions } from './estimators';
 import { lassoFit } from './lasso';
 import { runTrial, aggregate } from './simulator';
 import { shaferStrimmerShrinkage, bayesSteinShrinkage } from './shrinkage';
@@ -131,6 +131,21 @@ describe('修复回归：交叉拟合 DML 在小样本 n < nFolds 不崩溃', ()
     const r = crossFittingDML(data.Y, data.W, data.X, 5);
     expect(Number.isFinite(r.tau)).toBe(true);
     expect(Number.isFinite(r.se)).toBe(true);
+  });
+});
+
+describe('交叉拟合的验证折隔离', () => {
+  it('改变某验证折的 Y 不影响该折的 nuisance 预测或正则化选择', () => {
+    const X = Array.from({ length: 24 }, (_, i) => [Math.sin(i), i / 24]);
+    const Y = X.map(([x0, x1]) => 2 * x0 + x1);
+    const changed = Y.map((y, i) => y + (i % 4 === 0 ? 1_000 : 0));
+    const originalPredictions = crossFittedOutcomePredictions(Y, X, 4);
+    const changedPredictions = crossFittedOutcomePredictions(changed, X, 4);
+
+    for (let i = 0; i < Y.length; i += 4) {
+      expect(changedPredictions[i]).toBeCloseTo(originalPredictions[i], 10);
+    }
+    expect(Math.abs(changedPredictions[1] - originalPredictions[1])).toBeGreaterThan(1);
   });
 });
 

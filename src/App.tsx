@@ -25,9 +25,9 @@ const DEFAULT_BASE: BaseParams = {
 
 export default function App() {
   const [base, setBase] = useState<BaseParams>(DEFAULT_BASE);
-  const [nLevels, setNLevels] = useState<number[]>([200, 500, 1000]);
-  const [pLevels, setPLevels] = useState<number[]>([5, 20, 100]);
-  const [nTrials, setNTrials] = useState(120);
+  const [nLevels, setNLevels] = useState<number[]>([200, 500]);
+  const [pLevels, setPLevels] = useState<number[]>([5, 20]);
+  const [nTrials, setNTrials] = useState(10);
   const [estimators, setEstimators] = useState<EstimatorName[]>([
     'diff_in_means',
     'ols_adjusted',

@@ -98,7 +98,34 @@ export function lassoAdjusted(
   return { tau, se };
 }
 
-/** 4) 交叉拟合 DML：K 折，nuisance 用 Lasso，全局 lambda 由 CV 选定 */
+/** 仅用各外层训练折选择 lambda 并拟合 nuisance，验证折的 Y 不参与调参。 */
+export function crossFittedOutcomePredictions(
+  Y: number[],
+  X: number[][],
+  nFolds = 5,
+  fixedLambda: number | null = null,
+): number[] {
+  const n = Y.length;
+  if (n < 2) throw new Error('Cross-fitting requires at least two samples');
+  const k = Math.max(2, Math.min(nFolds, n));
+  const folds: number[][] = Array.from({ length: k }, () => []);
+  for (let i = 0; i < n; i++) folds[i % k].push(i);
+  const mHat = new Array(n).fill(0);
+  for (const valIdx of folds) {
+    const valSet = new Set(valIdx);
+    const trainIdx = [...Array(n).keys()].filter((i) => !valSet.has(i));
+    const Xtr = trainIdx.map((i) => X[i]);
+    const ytr = trainIdx.map((i) => Y[i]);
+    // A single training observation cannot support CV; use a fixed value only
+    // for this tiny-sample boundary case.
+    const lambda = fixedLambda ?? (Xtr.length > 1 ? lassoCV(Xtr, ytr) : 0.05);
+    const model = lassoFit(Xtr, ytr, lambda);
+    for (const i of valIdx) mHat[i] = model.predict([X[i]])[0];
+  }
+  return mHat;
+}
+
+/** 4) 交叉拟合 DML：K 折，nuisance 与 lambda 均只用外层训练折拟合 */
 export function crossFittingDML(
   Y: number[],
   W: number[],
@@ -107,20 +134,7 @@ export function crossFittingDML(
   fixedLambda: number | null = null,
 ): EstimatorResult {
   const n = Y.length;
-  if (n < 2) throw new Error('Cross-fitting requires at least two samples');
-  const k = Math.max(2, Math.min(nFolds, n));
-  const folds: number[][] = Array.from({ length: k }, () => []);
-  for (let i = 0; i < n; i++) folds[i % k].push(i);
-  const mHat = new Array(n).fill(0);
-  const lambda = fixedLambda ?? lassoCV(X, Y);
-  for (const valIdx of folds) {
-    const valSet = new Set(valIdx);
-    const trainIdx = [...Array(n).keys()].filter((i) => !valSet.has(i));
-    const Xtr = trainIdx.map((i) => X[i]);
-    const ytr = trainIdx.map((i) => Y[i]);
-    const model = lassoFit(Xtr, ytr, lambda);
-    for (const i of valIdx) mHat[i] = model.predict([X[i]])[0];
-  }
+  const mHat = crossFittedOutcomePredictions(Y, X, nFolds, fixedLambda);
   const eHat = mean(W);
   let num = 0;
   let den = 0;

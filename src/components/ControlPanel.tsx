@@ -207,7 +207,7 @@ export function ControlPanel(props: ControlPanelProps) {
           value={nTrials}
           onChange={(e) => setNTrials(Math.max(10, Number(e.target.value)))}
         />
-        <div className="hint">每个 (n,p) 单元重复抽样次数</div>
+        <div className="hint">默认 10 次便于快速演示；比较覆盖率时请增加重复次数，运行时间也会相应增长。</div>
       </div>
 
       <div className="field">
