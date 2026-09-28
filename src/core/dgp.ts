@@ -1,7 +1,7 @@
 // 数据生成过程（DGP）：围绕分层随机试验构造可控蒙特卡洛数据
 // 支持：样本量 n、协变量维度 p、四种相关结构、处理效应异质性、稀疏基线
 
-import { RNG, gaussian, multivariateNormal, shuffle } from './rng';
+import { RNG, cholesky, gaussian, multivariateNormalFromCholesky, shuffle } from './rng';
 import { quantile, mean, std } from './linalg';
 import type { DGPParams, Dataset } from './types';
 
@@ -47,9 +47,10 @@ export function generateCovariates(
   blockSize?: number,
 ): number[][] {
   const Sigma = covarianceMatrix(p, corrType, rho, blockSize);
+  const L = cholesky(Sigma);
   const m = new Array(p).fill(0);
   const X: number[][] = new Array(n);
-  for (let i = 0; i < n; i++) X[i] = multivariateNormal(rng, m, Sigma);
+  for (let i = 0; i < n; i++) X[i] = multivariateNormalFromCholesky(rng, m, L);
   return X;
 }
 

@@ -20,9 +20,9 @@ export function ResultTable({ results, estimators }: Props) {
     const avg = (key: keyof GridCellResult['summary'][EstimatorName]) =>
       cells.reduce((s, c) => s + (c.summary[est][key] as number), 0) / Math.max(1, cells.length);
     const cov = avg('coverage');
-    const oos = avg('meanOosSharpe');
-    const oosS = avg('meanOosSharpeShrunk');
-    const lift = oos !== 0 ? ((oosS - oos) / Math.abs(oos)) * 100 : 0;
+    const oos = avg('meanOosUtility');
+    const oosS = avg('meanOosUtilityShrunk');
+    const lift = oosS - oos;
     return {
       est,
       bias: avg('bias'),
@@ -52,9 +52,9 @@ export function ResultTable({ results, estimators }: Props) {
                 <th>RMSE</th>
                 <th>覆盖率</th>
                 <th>E|ŵ−w*|</th>
-                <th>OOS Sharpe</th>
-                <th>收缩 Sharpe</th>
-                <th>收缩提升</th>
+                <th>样本外效用</th>
+                <th>收缩后效用</th>
+                <th>效用差</th>
               </tr>
             </thead>
             <tbody>
@@ -69,7 +69,7 @@ export function ResultTable({ results, estimators }: Props) {
                   <td>{s.oosS.toFixed(3)}</td>
                   <td style={{ color: s.lift >= 0 ? 'var(--good)' : 'var(--bad)' }}>
                     {s.lift >= 0 ? '+' : ''}
-                    {s.lift.toFixed(1)}%
+                    {s.lift.toFixed(3)}
                   </td>
                 </tr>
               ))}
@@ -77,8 +77,8 @@ export function ResultTable({ results, estimators }: Props) {
           </table>
         </div>
         <div className="note">
-          覆盖率基于 95% 名义水平；收缩 Sharpe 为对估计 ATE 做数据驱动 Bayes–Stein 收缩（向零/无风险收缩，
-          强度由估计标准误决定，不使用真值）后的样本外夏普，体现“收缩基准 vs 无约束基准”的稳健性改善。
+          覆盖率基于 95% 名义水平；样本外效用 = 平均组合收益 − 0.5 × 风险厌恶系数 × 收益方差。
+          对照组潜在结果不作为无风险收益；收缩强度由估计标准误决定，不使用真实 ATE。效用差可以为负。
         </div>
       </div>
 

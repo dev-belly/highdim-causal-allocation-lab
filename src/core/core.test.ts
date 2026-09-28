@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { mulberry32 } from './rng';
-import { makeDataset, generateCoef } from './dgp';
+import { mulberry32, multivariateNormal } from './rng';
+import { makeDataset, generateCoef, covarianceMatrix, generateCovariates } from './dgp';
 import { fitEstimator, crossFittingDML, crossFittedOutcomePredictions } from './estimators';
 import { lassoFit } from './lasso';
-import { runTrial, aggregate } from './simulator';
+import { runTrial, aggregate, observedTreatedVariance } from './simulator';
 import { shaferStrimmerShrinkage, bayesSteinShrinkage } from './shrinkage';
 import { meanVarianceWeight, evaluateAllocation } from './portfolio';
 import type { DGPParams, EstimatorName } from './types';
@@ -36,6 +36,15 @@ describe('DGP 可复现性', () => {
     const b = makeDataset(base, mulberry32(42));
     expect(a.Y[0]).toBeCloseTo(b.Y[0], 10);
     expect(a.W).toEqual(b.W);
+  });
+
+  it('复用协方差分解后仍逐样本保持同一随机结果', () => {
+    const cov = covarianceMatrix(4, 'exchangeable', 0.4);
+    const rng = mulberry32(123);
+    const expected = Array.from({ length: 3 }, () =>
+      multivariateNormal(rng, [0, 0, 0, 0], cov),
+    );
+    expect(generateCovariates(mulberry32(123), 3, 4, 'exchangeable', 0.4)).toEqual(expected);
   });
 });
 
@@ -122,6 +131,25 @@ describe('均值-方差权重', () => {
     expect(w).toBeLessThanOrEqual(1);
     expect(w).toBeGreaterThanOrEqual(0);
   });
+
+  it('零风险资产权重的样本外效用为零，对照组潜在结果不是可投资的无风险收益', () => {
+    const cfg = { riskAversion: 1, allowShort: false, priorVar: 1, priorMean: 0 };
+    const result = evaluateAllocation(0, 1, 1, 4, [2, 4], cfg);
+    expect(result.oosUtility).toBe(0);
+    expect(result.oosUtilityShrunk).toBe(0);
+  });
+
+  it('风险方差只能从实际观测的处理组收益估计', () => {
+    expect(observedTreatedVariance([1, 3, -100, 100], [1, 1, 0, 0])).toBeCloseTo(2);
+    expect(observedTreatedVariance([1, 3, 999, -999], [1, 1, 0, 0])).toBeCloseTo(2);
+  });
+
+  it('样本外效用按实际风险厌恶系数计算', () => {
+    const cfg = { riskAversion: 2, allowShort: false, priorVar: 1, priorMean: 0 };
+    const result = evaluateAllocation(2, 2, 0, 2, [0, 2], cfg);
+    expect(result.wHat).toBeCloseTo(0.5);
+    expect(result.oosUtility).toBeCloseTo(0);
+  });
 });
 
 describe('修复回归：交叉拟合 DML 在小样本 n < nFolds 不崩溃', () => {
@@ -172,9 +200,8 @@ describe('修复回归：Bayes–Stein 收缩真正接入配置评估', () => {
     const cfgHi = { riskAversion: 1, allowShort: false, priorVar: 1.0, priorMean: 0.0 };
     const cfgLo = { riskAversion: 1, allowShort: false, priorVar: 100.0, priorMean: 0.0 };
     const y1 = Array.from({ length: 200 }, (_, i) => 2 + (i % 2));
-    const y0 = Array.from({ length: 200 }, () => 0);
-    const oHi = evaluateAllocation(2, 1, 2.0, 1.0, y1, y0, cfgHi); // se 大 → 强收缩
-    const oLo = evaluateAllocation(2, 1, 2.0, 1.0, y1, y0, cfgLo); // priorVar 大 → 弱收缩
+    const oHi = evaluateAllocation(2, 1, 2.0, 1.0, y1, cfgHi); // se 大 → 强收缩
+    const oLo = evaluateAllocation(2, 1, 2.0, 1.0, y1, cfgLo); // priorVar 大 → 弱收缩
     expect(Math.abs(oHi.wShrunk)).toBeLessThan(Math.abs(oLo.wShrunk));
     // 收缩权重不应等于（不依赖真值的）oracle 混合
     expect(oHi.wShrunk).not.toBeCloseTo(oHi.wStar, 6);

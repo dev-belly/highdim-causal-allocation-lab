@@ -43,8 +43,16 @@ export function cholesky(A: number[][]): number[][] {
 
 /** 多元正态采样：mean + L·z，z~N(0,I) */
 export function multivariateNormal(rng: RNG, mean: number[], cov: number[][]): number[] {
+  return multivariateNormalFromCholesky(rng, mean, cholesky(cov));
+}
+
+/** 多次采样共用协方差时，避免为每个样本重复做 Cholesky 分解。 */
+export function multivariateNormalFromCholesky(
+  rng: RNG,
+  mean: number[],
+  L: number[][],
+): number[] {
   const n = mean.length;
-  const L = cholesky(cov);
   const z: number[] = new Array(n);
   for (let i = 0; i < n; i++) z[i] = gaussian(rng);
   const out: number[] = new Array(n);

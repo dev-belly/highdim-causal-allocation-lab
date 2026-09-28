@@ -20,6 +20,13 @@ const DEFAULT_ALLOC = {
   priorMean: 0.0,
 };
 
+/** 只用随机试验中实际观测到的处理组结果估计风险资产方差。 */
+export function observedTreatedVariance(Y: number[], W: number[]): number {
+  const treated = Y.filter((_, i) => W[i] === 1);
+  if (treated.length < 2) throw new Error('At least two treated observations are required');
+  return Math.max(variance(treated), 1e-6);
+}
+
 /** 运行一次试验：返回每个估计量的指标（含独立测试集的样本外评估） */
 export function runTrial(
   params: DGPParams,
@@ -31,8 +38,8 @@ export function runTrial(
   // 样本外测试集复用同一组真实系数（同总体），仅重新抽取协变量/处理/噪声
   const testRng = mulberry32(seed + 1_000_000);
   const test = makeDataset(params, testRng, data.coef);
-  // 风险资产（处理组）收益方差
-  const sigma2 = variance(data.Y1) || 1e-6;
+  // 未接受处理者的 Y1 是不可观测的潜在结果，不能用于选择权重。
+  const sigma2 = observedTreatedVariance(data.Y, data.W);
 
   const out: TrialMetric[] = [];
   for (const name of estimators) {
@@ -43,7 +50,6 @@ export function runTrial(
       res.se,
       sigma2,
       test.Y1,
-      test.Y0,
       DEFAULT_ALLOC,
     );
     out.push({
@@ -92,8 +98,8 @@ export function aggregate(
       coverage,
       meanWeightAbsErr: mean(arr.map((m) => m.weightAbsErr)),
       meanUtilityLoss: mean(arr.map((m) => m.utilityLoss)),
-      meanOosSharpe: mean(arr.map((m) => m.oosSharpe)),
-      meanOosSharpeShrunk: mean(arr.map((m) => m.oosSharpeShrunk)),
+      meanOosUtility: mean(arr.map((m) => m.oosUtility)),
+      meanOosUtilityShrunk: mean(arr.map((m) => m.oosUtilityShrunk)),
     };
   }
   return summary;

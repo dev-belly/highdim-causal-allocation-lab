@@ -2,13 +2,21 @@
 将 ATE 估计误差映射到均值-方差资产配置问题。
 
 基本设定：
-- 两种资产：风险资产（处理组）与无风险资产（对照组）
+- 两种资产：处理组对应的风险资产与零超额收益的无风险资产
 - 真实期望超额收益为 ATE_true
 - 投资者使用估计的 ATE_hat 进行均值-方差优化
 - 比较估计权重与真实最优权重的差异及样本外表现
 """
 
 import numpy as np
+
+
+def observed_treated_variance(Y, W):
+    """只用实际观测到的处理组结果估计风险资产方差。"""
+    treated = np.asarray(Y)[np.asarray(W) == 1]
+    if treated.size < 2:
+        raise ValueError("At least two treated observations are required")
+    return max(float(treated.var(ddof=1)), 1e-6)
 
 
 def mean_variance_weight(mu, sigma2, risk_aversion=1.0, allow_short=True):
@@ -54,7 +62,8 @@ def bayes_stein_shrinkage(mu, var_mu, tau2, prior_mean=None):
     return (1 - w) * mu + w * overall
 
 
-def portfolio_metrics(w_hat, w_star, mu_true, sigma2_true, test_Y1, test_Y0=None, w_shrunk=None):
+def portfolio_metrics(w_hat, w_star, mu_true, sigma2_true, test_Y1,
+                      w_shrunk=None, risk_aversion=1.0):
     """
     评估估计权重相对于真实最优权重的表现。
 
@@ -67,13 +76,13 @@ def portfolio_metrics(w_hat, w_star, mu_true, sigma2_true, test_Y1, test_Y0=None
     mu_true : float
         真实 ATE
     sigma2_true : float
-        真实收益方差
+        风险资产收益方差输入；实验从实际观测的处理组估计
     test_Y1 : ndarray
         测试集处理组结果（用于样本外收益）
-    test_Y0 : ndarray, optional
-        测试集对照组结果；若提供则计算样本外实际组合收益
     w_shrunk : float, optional
         数据驱动收缩后的权重（用于对比“收缩基准 vs 无约束基准”）
+    risk_aversion : float
+        样本外确定性等价效用的风险厌恶系数
 
     Returns
     -------
@@ -83,8 +92,8 @@ def portfolio_metrics(w_hat, w_star, mu_true, sigma2_true, test_Y1, test_Y0=None
     weight_abs_err = np.abs(weight_bias)
 
     # 理论预期效用损失（基于真实分布）
-    utility_star = w_star * mu_true - 0.5 * (w_star ** 2) * sigma2_true
-    utility_hat = w_hat * mu_true - 0.5 * (w_hat ** 2) * sigma2_true
+    utility_star = w_star * mu_true - 0.5 * risk_aversion * (w_star ** 2) * sigma2_true
+    utility_hat = w_hat * mu_true - 0.5 * risk_aversion * (w_hat ** 2) * sigma2_true
     utility_loss = utility_star - utility_hat
 
     metrics = {
@@ -95,15 +104,19 @@ def portfolio_metrics(w_hat, w_star, mu_true, sigma2_true, test_Y1, test_Y0=None
         "utility_loss": utility_loss,
     }
 
-    if test_Y1 is not None and test_Y0 is not None:
-        # 样本外组合收益：w * Y1 + (1-w) * Y0
-        port_returns = w_hat * test_Y1 + (1 - w_hat) * test_Y0
+    if test_Y1 is not None:
+        # 无风险资产超额收益为零。对照组潜在结果不是可投资的无风险收益。
+        port_returns = w_hat * np.asarray(test_Y1)
         metrics["oos_mean_return"] = port_returns.mean()
         metrics["oos_volatility"] = port_returns.std(ddof=1)
-        metrics["oos_sharpe"] = metrics["oos_mean_return"] / (metrics["oos_volatility"] + 1e-9)
+        metrics["oos_utility"] = metrics["oos_mean_return"] - (
+            0.5 * risk_aversion * port_returns.var(ddof=1)
+        )
         if w_shrunk is not None:
-            port_shrunk = w_shrunk * test_Y1 + (1 - w_shrunk) * test_Y0
-            metrics["oos_sharpe_shrunk"] = port_shrunk.mean() / (port_shrunk.std(ddof=1) + 1e-9)
+            port_shrunk = w_shrunk * np.asarray(test_Y1)
+            metrics["oos_utility_shrunk"] = port_shrunk.mean() - (
+                0.5 * risk_aversion * port_shrunk.var(ddof=1)
+            )
             metrics["w_shrunk"] = w_shrunk
 
     return metrics
@@ -121,10 +134,11 @@ def map_ate_error_to_portfolio(tau_hat, tau_true, sigma2_true=1.0,
     tau_hat : float
     tau_true : float
     sigma2_true : float
+        风险资产收益方差输入；实验从实际观测的处理组估计
     risk_aversion : float
     allow_short : bool
     test_data : dict, optional
-        {"Y1": ..., "Y0": ...}
+        {"Y1": ...}; Y0 只用于因果估计，不是无风险收益
     se_hat : float
         估计 ATE 的标准误（驱动数据驱动的收缩强度）
     prior_var : float
@@ -144,6 +158,7 @@ def map_ate_error_to_portfolio(tau_hat, tau_true, sigma2_true=1.0,
     w_shrunk = mean_variance_weight(tau_shrunk, sigma2_true, risk_aversion, allow_short)
 
     test_Y1 = test_data["Y1"] if test_data else None
-    test_Y0 = test_data["Y0"] if test_data else None
-
-    return portfolio_metrics(w_hat, w_star, tau_true, sigma2_true, test_Y1, test_Y0, w_shrunk=w_shrunk)
+    return portfolio_metrics(
+        w_hat, w_star, tau_true, sigma2_true, test_Y1,
+        w_shrunk=w_shrunk, risk_aversion=risk_aversion,
+    )

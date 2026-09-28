@@ -12,7 +12,12 @@ import src.estimators as estimators_module  # noqa: E402
 from src.data_generating_process import make_dataset  # noqa: E402
 from src.estimators import fit_estimator  # noqa: E402
 from src.evaluation import aggregate_results  # noqa: E402
-from src.portfolio import map_ate_error_to_portfolio  # noqa: E402
+from src.experiment import single_trial  # noqa: E402
+from src.portfolio import (  # noqa: E402
+    map_ate_error_to_portfolio,
+    observed_treated_variance,
+    portfolio_metrics,
+)
 
 ESTIMATORS = [
     "diff_in_means",
@@ -37,18 +42,63 @@ BASE_DGP = dict(
 )
 
 
+def test_portfolio_uses_cash_as_zero_return_not_unobserved_control_outcomes():
+    metrics = map_ate_error_to_portfolio(
+        tau_hat=0.0,
+        tau_true=1.0,
+        sigma2_true=4.0,
+        allow_short=False,
+        test_data={"Y1": np.array([2.0, 4.0]), "Y0": np.array([-5.0, 5.0])},
+        se_hat=1.0,
+    )
+    assert metrics["w_hat"] == 0.0
+    assert metrics["oos_utility"] == 0.0
+    assert metrics["oos_utility_shrunk"] == 0.0
+
+
+def test_portfolio_risk_variance_uses_observed_treatment_arm_only():
+    assert observed_treated_variance(
+        np.array([1.0, 3.0, -100.0, 100.0]), np.array([1, 1, 0, 0])
+    ) == pytest.approx(2.0)
+    assert observed_treated_variance(
+        np.array([1.0, 3.0, 999.0, -999.0]), np.array([1, 1, 0, 0])
+    ) == pytest.approx(2.0)
+
+
+def test_oos_utility_uses_configured_risk_aversion():
+    metrics = portfolio_metrics(
+        w_hat=0.5,
+        w_star=0.5,
+        mu_true=2.0,
+        sigma2_true=2.0,
+        test_Y1=np.array([0.0, 2.0]),
+        risk_aversion=2.0,
+    )
+    assert metrics["oos_utility"] == pytest.approx(0.0)
+
+
+def test_experiment_trial_reports_finite_oos_utility():
+    result = single_trial(dict(BASE_DGP, p=5), "diff_in_means", {}, 42)
+    assert np.isfinite(result["oos_utility"])
+    assert np.isfinite(result["oos_utility_shrunk"])
+
+
 def run_one_trial(est, seed, n_trials=10):
     results = []
     for t in range(n_trials):
         rng = np.random.default_rng(seed + t)
         data = make_dataset(**BASE_DGP, rng=rng)
         res = fit_estimator(est, data["Y"], data["W"], data["X"])
-        test_data = make_dataset(**BASE_DGP, rng=np.random.default_rng(seed + t + 1_000_000))
+        test_data = make_dataset(
+            **BASE_DGP,
+            rng=np.random.default_rng(seed + t + 1_000_000),
+            coef=(data["beta"], data["gamma"]),
+        )
         port = map_ate_error_to_portfolio(
             res["tau"],
             BASE_DGP["ate"],
-            data["Y"].var(ddof=1),
-            test_data={"Y1": test_data["Y1"], "Y0": test_data["Y0"]},
+            observed_treated_variance(data["Y"], data["W"]),
+            test_data={"Y1": test_data["Y1"]},
         )
         res.update(port)
         results.append(res)

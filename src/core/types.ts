@@ -52,8 +52,8 @@ export interface TrialMetric extends EstimatorResult {
   weightBias: number;
   weightAbsErr: number;
   utilityLoss: number;
-  oosSharpe: number;
-  oosSharpeShrunk: number;
+  oosUtility: number;
+  oosUtilityShrunk: number;
 }
 
 export interface EstimatorSummary {
@@ -64,8 +64,8 @@ export interface EstimatorSummary {
   coverage: number;
   meanWeightAbsErr: number;
   meanUtilityLoss: number;
-  meanOosSharpe: number;
-  meanOosSharpeShrunk: number;
+  meanOosUtility: number;
+  meanOosUtilityShrunk: number;
 }
 
 export interface GridCellResult {

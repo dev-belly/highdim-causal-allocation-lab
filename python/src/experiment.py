@@ -21,7 +21,7 @@ from joblib import Parallel, delayed
 from src.data_generating_process import make_dataset
 from src.estimators import fit_estimator
 from src.evaluation import aggregate_results
-from src.portfolio import map_ate_error_to_portfolio
+from src.portfolio import map_ate_error_to_portfolio, observed_treated_variance
 
 sns.set_theme(style="whitegrid")
 
@@ -45,10 +45,10 @@ def single_trial(dgp_params, estimator_name, est_kwargs, seed):
     port = map_ate_error_to_portfolio(
         tau_hat=res["tau"],
         tau_true=data["ate_true"],
-        sigma2_true=data["Y1"].var(ddof=1),  # 风险资产（处理组）方差
+        sigma2_true=observed_treated_variance(data["Y"], data["W"]),
         risk_aversion=1.0,
         allow_short=False,
-        test_data={"Y1": test_data["Y1"], "Y0": test_data["Y0"]},
+        test_data={"Y1": test_data["Y1"]},
         se_hat=res["se"],
     )
     res.update(port)
@@ -72,8 +72,10 @@ def run_one_cell(dgp_params, estimators, n_trials, est_kwargs_map, base_seed):
         metrics["mean_weight_bias"] = np.mean([r["weight_bias"] for r in trial_results])
         metrics["mean_weight_abs_err"] = np.mean([r["weight_abs_err"] for r in trial_results])
         metrics["mean_utility_loss"] = np.mean([r["utility_loss"] for r in trial_results])
-        metrics["mean_oos_sharpe"] = np.mean([r.get("oos_sharpe", np.nan) for r in trial_results])
-        metrics["mean_oos_sharpe_shrunk"] = np.mean([r.get("oos_sharpe_shrunk", np.nan) for r in trial_results])
+        metrics["mean_oos_utility"] = np.mean([r.get("oos_utility", np.nan) for r in trial_results])
+        metrics["mean_oos_utility_shrunk"] = np.mean([
+            r.get("oos_utility_shrunk", np.nan) for r in trial_results
+        ])
 
         records.append(metrics)
     return records
@@ -157,7 +159,7 @@ def generate_report(df, output_dir):
 
     # 选取关键指标表格
     table_cols = ["estimator", "n", "p", "corr_type", "hetero_type",
-                  "bias", "std_dev", "rmse", "coverage", "mean_weight_abs_err", "mean_oos_sharpe"]
+                  "bias", "std_dev", "rmse", "coverage", "mean_weight_abs_err", "mean_oos_utility"]
     table_cols = [c for c in table_cols if c in df.columns]
 
     summary = df.groupby("estimator")[["bias", "rmse", "coverage", "mean_weight_abs_err", "mean_utility_loss"]].mean()
@@ -180,7 +182,7 @@ def generate_report(df, output_dir):
         f.write(f"- **覆盖率最接近名义 95%**：{best_cov}\n")
         f.write("- 随着样本量增加，所有估计量的 RMSE 均下降，但高维（p 接近或超过 n）时 OLS 调整表现明显退化。\n")
         f.write("- Lasso 调整与交叉拟合在高维场景下更稳健，覆盖率更接近名义水平。\n")
-        f.write("- 资产配置权重偏移随估计误差放大，样本量不足时会导致显著的样本外夏普比率损失。\n\n")
+        f.write("- 用独立测试集的确定性等价效用评估配置；收缩可能改善也可能恶化效用。\n\n")
 
         f.write("## 4. 输出文件\n\n")
         f.write("- `results.csv`：完整参数矩阵与指标\n")
