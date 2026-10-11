@@ -54,7 +54,7 @@ def generate_covariates(n, p, corr_type="independent", rho=0.5, block_size=None,
 
     # 保证正定
     Sigma += 1e-6 * np.eye(p)
-    X = rng.multivariate_normal(mean=np.zeros(p), cov=Sigma, size=n)
+    X = rng.multivariate_normal(mean=np.zeros(p), cov=Sigma, size=n, check_valid="raise")
     return X
 
 

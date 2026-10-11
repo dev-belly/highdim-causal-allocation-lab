@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import src.estimators as estimators_module  # noqa: E402
-from src.data_generating_process import make_dataset  # noqa: E402
+from src.data_generating_process import generate_covariates, make_dataset  # noqa: E402
 from src.estimators import fit_estimator  # noqa: E402
 from src.evaluation import aggregate_results  # noqa: E402
 from src.experiment import single_trial  # noqa: E402
@@ -40,6 +40,11 @@ BASE_DGP = dict(
     noise_sd=1.0,
     sparse=True,
 )
+
+
+def test_covariate_generation_rejects_invalid_covariance():
+    with pytest.raises(ValueError, match="positive-semidefinite"):
+        generate_covariates(10, 3, "exchangeable", rho=1.2, rng=np.random.default_rng(42))
 
 
 def test_portfolio_uses_cash_as_zero_return_not_unobserved_control_outcomes():

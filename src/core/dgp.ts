@@ -22,7 +22,7 @@ export function covarianceMatrix(
       for (let j = 0; j < p; j++) Sigma[i][j] = i === j ? 1 : rho;
   } else if (corrType === 'ar1') {
     for (let i = 0; i < p; i++)
-      for (let j = 0; j < p; j++) Sigma[i][j] = Math.pow(Math.abs(rho), Math.abs(i - j));
+      for (let j = 0; j < p; j++) Sigma[i][j] = Math.pow(rho, Math.abs(i - j));
   } else if (corrType === 'block') {
     const bs = blockSize || Math.max(1, Math.floor(p / 4));
     for (let i = 0; i < p; i++)

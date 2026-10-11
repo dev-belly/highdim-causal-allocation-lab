@@ -32,9 +32,12 @@ export function cholesky(A: number[][]): number[][] {
       let s = A[i][j];
       for (let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
       if (i === j) {
-        L[i][j] = Math.sqrt(Math.max(s, 1e-12));
+        if (!Number.isFinite(s) || s <= 0) {
+          throw new Error('Covariance matrix must be positive definite');
+        }
+        L[i][j] = Math.sqrt(s);
       } else {
-        L[i][j] = s / (L[j][j] || 1e-12);
+        L[i][j] = s / L[j][j];
       }
     }
   }
