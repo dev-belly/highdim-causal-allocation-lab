@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mulberry32, multivariateNormal } from './rng';
+import { mulberry32, multivariateNormal, cholesky } from './rng';
 import { makeDataset, generateCoef, covarianceMatrix, generateCovariates } from './dgp';
 import { fitEstimator, crossFittingDML, crossFittedOutcomePredictions } from './estimators';
 import { lassoFit } from './lasso';
@@ -31,6 +31,17 @@ const ESTIMATORS: EstimatorName[] = [
 ];
 
 describe('DGP 可复现性', () => {
+  it('AR(1) 的负相关系数在奇数距离保留负号', () => {
+    const covariance = covarianceMatrix(3, 'ar1', -0.5);
+    expect(covariance[0][1]).toBe(-0.5);
+    expect(covariance[0][2]).toBe(0.25);
+  });
+
+  it('非正定协方差不能通过截断负主元伪造采样结果', () => {
+    expect(() => cholesky([[1, 2], [2, 1]])).toThrow(/positive definite/);
+    expect(() => makeDataset({ ...base, rho: 1.2 }, mulberry32(42))).toThrow(/positive definite/);
+  });
+
   it('相同种子生成完全相同的数据', () => {
     const a = makeDataset(base, mulberry32(42));
     const b = makeDataset(base, mulberry32(42));
