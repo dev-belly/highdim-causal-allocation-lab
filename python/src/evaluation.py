@@ -76,6 +76,8 @@ def run_monte_carlo(dgp_params, estimators, n_trials=500, seed=0, est_kwargs_map
     estimators : list of str
     n_trials : int
     seed : int
+        Each trial seed is reused across estimators, so the comparison is paired
+        and adding/reordering estimators does not change another estimator's data.
     est_kwargs_map : dict
         每个估计量的额外参数
 
@@ -85,12 +87,13 @@ def run_monte_carlo(dgp_params, estimators, n_trials=500, seed=0, est_kwargs_map
     """
     est_kwargs_map = est_kwargs_map or {}
     rng = np.random.default_rng(seed)
+    trial_seeds = rng.integers(0, 2 ** 31, size=n_trials)
 
     records = []
     for est_name in estimators:
         results = []
-        for t in range(n_trials):
-            trial_rng = np.random.default_rng(rng.integers(0, 2 ** 31))
+        for trial_seed in trial_seeds:
+            trial_rng = np.random.default_rng(trial_seed)
             res = run_single_trial(dgp_params, est_name, est_kwargs_map.get(est_name), rng=trial_rng)
             results.append(res)
 
