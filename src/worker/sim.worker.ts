@@ -29,6 +29,9 @@ ctx.onmessage = (e: MessageEvent<RunRequest>) => {
       results.push(runTrial(params, estimators, seed + t * 7919 + c * 104729));
     }
     const summary = aggregate(results, params.ate);
+    if (Object.values(summary).some((metric) => Object.values(metric).some((value) => !Number.isFinite(value)))) {
+      throw new RangeError(`第 ${c + 1} 组参数的计算超出数值范围，请缩小处理效应、噪声或异质强度后重试。`);
+    }
     const cell: GridCellResult = { params, summary };
     allSummary.push(cell);
     const msg: WorkerMessage = {

@@ -33,48 +33,52 @@ export function useSimulation(): SimState {
 
   const start = useCallback(
     (grid: DGPParams[], estimators: EstimatorName[], nTrials: number, seed = 42) => {
-      if (workerRef.current) workerRef.current.terminate();
-      const worker = new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
-        type: 'module',
-      });
-      workerRef.current = worker;
+      stop();
       setError(null);
-      setRunning(true);
       setResults([]);
       setProgress({ done: 0, total: grid.length });
 
+      let worker: Worker;
+      try {
+        worker = new Worker(new URL('../worker/sim.worker.ts', import.meta.url), { type: 'module' });
+      } catch {
+        setError('无法启动模拟线程，请刷新后重试。');
+        return;
+      }
+      workerRef.current = worker;
+      setRunning(true);
+
       worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+        if (workerRef.current !== worker) return;
         const msg = e.data;
         if (msg.type === 'progress') {
           setProgress({ done: msg.done, total: msg.total });
           setResults((prev) => [...prev, msg.cell]);
         } else if (msg.type === 'done') {
           setResults(msg.allSummary);
-          setRunning(false);
-          worker.terminate();
-          workerRef.current = null;
+          stop();
         }
       };
-      worker.onerror = (event) => {
-        setError(event.message || '模拟运行失败，请检查参数后重试。');
-        setRunning(false);
-        worker.terminate();
-        workerRef.current = null;
-      };
-      worker.onmessageerror = () => {
-        setError('模拟结果无法解析，请刷新后重试。');
-        setRunning(false);
-        worker.terminate();
-        workerRef.current = null;
-      };
-      worker.postMessage({ grid, estimators, nTrials, seed });
+      function fail(message: string) {
+        if (workerRef.current !== worker) return;
+        setError(message);
+        stop();
+      }
+      worker.onerror = (event) => fail(event.message || '模拟运行失败，请检查参数后重试。');
+      worker.onmessageerror = () => fail('模拟结果无法解析，请刷新后重试。');
+      try {
+        worker.postMessage({ grid, estimators, nTrials, seed });
+      } catch {
+        fail('无法发送模拟参数，请刷新后重试。');
+      }
     },
-    [],
+    [stop],
   );
 
   useEffect(() => {
     return () => {
-      if (workerRef.current) workerRef.current.terminate();
+      workerRef.current?.terminate();
+      workerRef.current = null;
     };
   }, []);
 

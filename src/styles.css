@@ -124,6 +124,11 @@ body {
 .field select:focus {
   border-color: var(--accent);
 }
+.field input:disabled {
+  background: #eef2f7;
+  color: var(--text-2);
+  cursor: not-allowed;
+}
 .field .hint {
   font-size: 10.5px;
   color: var(--text-2);
@@ -197,21 +202,23 @@ body {
   color: var(--text-1);
 }
 
+.run-check {
+  margin: 16px 0 10px;
+  color: var(--text-1);
+  font-size: .875rem;
+  line-height: 1.55;
+}
+.run-check.invalid { color: var(--bad); }
+
 /* ---------- Progress ---------- */
 .progress-wrap {
   margin-top: 14px;
 }
 .progress-track {
+  display: block;
+  width: 100%;
   height: 8px;
-  background: var(--bg-0);
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  transition: width 0.25s;
+  accent-color: var(--accent);
 }
 .progress-text {
   font-size: .875rem;
@@ -220,6 +227,22 @@ body {
   display: flex;
   justify-content: space-between;
 }
+
+.run-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 18px;
+  padding: clamp(16px, 3vw, 24px);
+  background: linear-gradient(95deg, #fff, #eff4ff);
+}
+.run-summary h2 { margin-bottom: 4px; }
+.run-summary p { margin: 0; color: var(--text-1); font-size: .875rem; }
+.run-summary dl { display: flex; flex-wrap: wrap; gap: 12px 30px; margin: 0; }
+.run-summary dt { margin-bottom: 3px; color: var(--text-1); font-size: .75rem; }
+.run-summary dd { margin: 0; font-size: 1.3rem; font-weight: 650; font-variant-numeric: tabular-nums; }
 
 /* ---------- Charts ---------- */
 .charts {
