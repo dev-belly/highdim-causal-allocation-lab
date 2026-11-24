@@ -33,7 +33,7 @@ export function CoverageChart({ results, estimators = [], selectedP }: ChartProp
   const layout = {
     title: { text: `95% CI 覆盖率（p=${selectedP}）`, font: { size: 14 } },
     xaxis: { title: '样本量 n', type: 'log' },
-    yaxis: { title: '覆盖率', range: [0.8, 1] },
+    yaxis: { title: '覆盖率', range: [0, 1] },
     shapes: [
       {
         type: 'line',
@@ -42,7 +42,7 @@ export function CoverageChart({ results, estimators = [], selectedP }: ChartProp
         x1: 1,
         y0: 0.95,
         y1: 0.95,
-        line: { color: '#f87171', width: 1.5, dash: 'dash' },
+        line: { color: '#a34745', width: 1.5, dash: 'dash' },
       },
     ],
   };
