@@ -31,7 +31,7 @@ interface PlotProps {
 
 const CONFIG = { responsive: true, displayModeBar: false } as const;
 
-/** 通用 Plotly 容器：深色主题、响应式、无工具栏。Plotly 由 CDN 注入 window.Plotly。 */
+/** 通用 Plotly 容器：响应式、无工具栏。Plotly 由 CDN 注入 window.Plotly。 */
 export function Plot({ data, layout, className }: PlotProps) {
   const ref = useRef<HTMLDivElement>(null);
   const plotted = useRef(false);
@@ -45,10 +45,10 @@ export function Plot({ data, layout, className }: PlotProps) {
     const baseLayout: Record<string, unknown> = {
       paper_bgcolor: 'rgba(0,0,0,0)',
       plot_bgcolor: 'rgba(0,0,0,0)',
-      font: { color: '#9fb0c9', family: 'Inter, -apple-system, sans-serif', size: 12 },
+      font: { color: '#465575', family: 'Inter, -apple-system, sans-serif', size: 12 },
       margin: { t: 46, r: 18, b: 52, l: 64 },
-      xaxis: { gridcolor: '#1f2a40', zerolinecolor: '#2c3852', linecolor: '#2c3852' },
-      yaxis: { gridcolor: '#1f2a40', zerolinecolor: '#2c3852', linecolor: '#2c3852' },
+      xaxis: { gridcolor: '#e1e7f1', zerolinecolor: '#b8c8e1', linecolor: '#b8c8e1' },
+      yaxis: { gridcolor: '#e1e7f1', zerolinecolor: '#b8c8e1', linecolor: '#b8c8e1' },
       legend: { orientation: 'h', y: -0.18, font: { size: 11 } },
       hovermode: 'closest',
     };
@@ -94,4 +94,4 @@ export function Plot({ data, layout, className }: PlotProps) {
   return <div ref={ref} className={className} style={{ width: '100%', height: '100%' }} />;
 }
 
-export const PALETTE = ['#4f9dff', '#22d3ee', '#34d399', '#fbbf24', '#f87171', '#a78bfa'];
+export const PALETTE = ['#2555bb', '#237a9d', '#16825d', '#aa671f', '#a54b56', '#7352a8'];

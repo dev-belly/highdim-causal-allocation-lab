@@ -61,22 +61,10 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div>
-          <h1>高维协变量调整与稳健资产配置实验平台</h1>
+          <h1>高维因果与稳健配置</h1>
           <div className="subtitle">
-            交互式蒙特卡洛因果推断实验室：比较差分均值 / OLS / Lasso / 交叉拟合 DML
-            在高维下的有限样本表现，并将估计误差映射到均值-方差稳健配置的样本外风险与权重偏移。
+            运行蒙特卡洛模拟，对照四种估计量的有限样本表现，再比较它们带来的配置偏差。
           </div>
-        </div>
-        <div className="expert-bar">
-          <span className="expert-chip">
-            工程规范 · <b>ModernWebappExpert</b>
-          </span>
-          <span className="expert-chip">
-            配置方法论 · <b>EquityResearchExpert</b>
-          </span>
-          <span className="expert-chip">
-            量化把关 · <b>TradingAgentTeam</b>
-          </span>
         </div>
       </header>
 
@@ -112,13 +100,15 @@ export default function App() {
                   <label>固定维度 p（用于折线图）</label>
                   <div className="chips">
                     {psInResults.map((p) => (
-                      <span
+                      <button
                         key={p}
+                        type="button"
+                        aria-pressed={effP === p}
                         className={`chip ${effP === p ? 'active' : ''}`}
                         onClick={() => setSelectedP(p)}
                       >
                         {p}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -126,13 +116,15 @@ export default function App() {
                   <label>选择估计量（用于热力图 / 曲面）</label>
                   <div className="chips">
                     {estsInResults.map((e) => (
-                      <span
+                      <button
                         key={e}
+                        type="button"
+                        aria-pressed={effEst === e}
                         className={`chip ${effEst === e ? 'active' : ''}`}
                         onClick={() => setSelectedEstimator(e)}
                       >
                         {e}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -143,12 +135,12 @@ export default function App() {
                 <div className="chart-grid-2">
                   <CoverageChart
                     results={results}
-                    estimators={estimators}
+                    estimators={estsInResults}
                     selectedP={effP}
                   />
                   <WeightErrorChart
                     results={results}
-                    estimators={estimators}
+                    estimators={estsInResults}
                     selectedP={effP}
                   />
                 </div>
@@ -162,7 +154,7 @@ export default function App() {
                 </div>
               </div>
 
-              <ResultTable results={results} estimators={estimators} />
+              <ResultTable results={results} estimators={estsInResults} />
             </div>
           )}
         </div>

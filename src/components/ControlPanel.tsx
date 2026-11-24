@@ -82,13 +82,15 @@ export function ControlPanel(props: ControlPanelProps) {
         <label>协变量相关结构</label>
         <div className="chips">
           {CORR_OPTIONS.map((o) => (
-            <span
+            <button
               key={o.value}
+              type="button"
+              aria-pressed={base.corrType === o.value}
               className={`chip ${base.corrType === o.value ? 'active' : ''}`}
               onClick={() => set('corrType', o.value)}
             >
               {o.label}
-            </span>
+            </button>
           ))}
         </div>
       </div>
@@ -120,13 +122,15 @@ export function ControlPanel(props: ControlPanelProps) {
         <label>处理效应异质性</label>
         <div className="chips">
           {HET_OPTIONS.map((o) => (
-            <span
+            <button
               key={o.value}
+              type="button"
+              aria-pressed={base.heteroType === o.value}
               className={`chip ${base.heteroType === o.value ? 'active' : ''}`}
               onClick={() => set('heteroType', o.value)}
             >
               {o.label}
-            </span>
+            </button>
           ))}
         </div>
       </div>
@@ -157,13 +161,15 @@ export function ControlPanel(props: ControlPanelProps) {
         <label>分配机制</label>
         <div className="chips">
           {ASSIGN_OPTIONS.map((o) => (
-            <span
+            <button
               key={o.value}
+              type="button"
+              aria-pressed={base.assignment === o.value}
               className={`chip ${base.assignment === o.value ? 'active' : ''}`}
               onClick={() => set('assignment', o.value)}
             >
               {o.label}
-            </span>
+            </button>
           ))}
         </div>
       </div>
@@ -172,13 +178,15 @@ export function ControlPanel(props: ControlPanelProps) {
         <label>样本量扫描 n</label>
         <div className="chips">
           {N_OPTIONS.map((v) => (
-            <span
+            <button
               key={v}
+              type="button"
+              aria-pressed={nLevels.includes(v)}
               className={`chip ${nLevels.includes(v) ? 'active' : ''}`}
               onClick={() => setNLevels(toggle(nLevels, v))}
             >
               {v}
-            </span>
+            </button>
           ))}
         </div>
       </div>
@@ -187,13 +195,15 @@ export function ControlPanel(props: ControlPanelProps) {
         <label>维度扫描 p</label>
         <div className="chips">
           {P_OPTIONS.map((v) => (
-            <span
+            <button
               key={v}
+              type="button"
+              aria-pressed={pLevels.includes(v)}
               className={`chip ${pLevels.includes(v) ? 'active' : ''}`}
               onClick={() => setPLevels(toggle(pLevels, v))}
             >
               {v}
-            </span>
+            </button>
           ))}
         </div>
       </div>
@@ -214,13 +224,15 @@ export function ControlPanel(props: ControlPanelProps) {
         <label>估计量（可多选）</label>
         <div className="chips">
           {EST_OPTIONS.map((o) => (
-            <span
+            <button
               key={o.value}
+              type="button"
+              aria-pressed={estimators.includes(o.value)}
               className={`chip ${estimators.includes(o.value) ? 'active' : ''}`}
               onClick={() => setEstimators(toggle(estimators, o.value))}
             >
               {o.label}
-            </span>
+            </button>
           ))}
         </div>
       </div>
