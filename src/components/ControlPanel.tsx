@@ -1,6 +1,5 @@
-import type { CorrType, HeteroType, Assignment, EstimatorName, DGPParams } from '../core/types';
-
-export type BaseParams = Omit<DGPParams, 'n' | 'p'>;
+import { MAX_TRIALS, MIN_TRIALS, maximumStrata, type BaseParams } from '../core/design';
+import type { CorrType, HeteroType, Assignment, EstimatorName } from '../core/types';
 
 interface ChipOption<T> {
   value: T;
@@ -20,6 +19,7 @@ interface ControlPanelProps {
   setEstimators: (v: EstimatorName[]) => void;
   running: boolean;
   progress: { done: number; total: number };
+  runIssue: string;
   onRun: () => void;
   onStop: () => void;
 }
@@ -52,29 +52,36 @@ function toggle<T>(arr: T[], v: T): T[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
+function numericDisplay(value: number) {
+  return Number.isFinite(value) ? value : '';
+}
+
 export function ControlPanel(props: ControlPanelProps) {
   const {
     base, setBase, nLevels, setNLevels, pLevels, setPLevels,
-    nTrials, setNTrials, estimators, setEstimators, running, progress, onRun, onStop,
+    nTrials, setNTrials, estimators, setEstimators, running, progress, runIssue, onRun, onStop,
   } = props;
 
   const set = <K extends keyof BaseParams>(key: K, val: BaseParams[K]) =>
     setBase({ ...base, [key]: val });
 
-  const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
-  const hasRunnableGrid = nLevels.length > 0 && pLevels.length > 0 && estimators.length > 0;
+  const gridSize = nLevels.length * pLevels.length;
 
   return (
-    <div className="card">
-      <h2>实验设计</h2>
+    <form className="card" aria-labelledby="design-heading" noValidate onSubmit={(event) => {
+      event.preventDefault();
+      if (!running && !runIssue) onRun();
+    }}>
+      <h2 id="design-heading">实验设计</h2>
 
       <div className="field">
-        <label>处理效应 ATE</label>
+        <label htmlFor="effect">处理效应 ATE</label>
         <input
+          id="effect"
           type="number"
-          step="0.1"
-          value={base.ate}
-          onChange={(e) => set('ate', Number(e.target.value))}
+          step="any"
+          value={numericDisplay(base.ate)}
+          onChange={(event) => set('ate', event.currentTarget.valueAsNumber)}
         />
       </div>
 
@@ -97,23 +104,25 @@ export function ControlPanel(props: ControlPanelProps) {
 
       <div className="row">
         <div className="field">
-          <label>相关系数 ρ</label>
+          <label htmlFor="correlation">相关系数 ρ</label>
           <input
+            id="correlation"
             type="number"
-            step="0.05"
-            min="0"
-            max="0.95"
-            value={base.rho}
-            onChange={(e) => set('rho', Number(e.target.value))}
+            step="any"
+            disabled={base.corrType === 'independent'}
+            value={numericDisplay(base.rho)}
+            onChange={(event) => set('rho', event.currentTarget.valueAsNumber)}
           />
         </div>
         <div className="field">
-          <label>噪声 σ</label>
+          <label htmlFor="noise">噪声 σ</label>
           <input
+            id="noise"
             type="number"
-            step="0.1"
-            value={base.noiseSd}
-            onChange={(e) => set('noiseSd', Number(e.target.value))}
+            step="any"
+            min="0"
+            value={numericDisplay(base.noiseSd)}
+            onChange={(event) => set('noiseSd', event.currentTarget.valueAsNumber)}
           />
         </div>
       </div>
@@ -137,22 +146,28 @@ export function ControlPanel(props: ControlPanelProps) {
 
       <div className="row">
         <div className="field">
-          <label>异质强度</label>
+          <label htmlFor="heterogeneity">异质强度</label>
           <input
+            id="heterogeneity"
             type="number"
-            step="0.1"
-            value={base.heteroStrength}
-            onChange={(e) => set('heteroStrength', Number(e.target.value))}
+            step="any"
+            min="0"
+            disabled={base.heteroType === 'homogeneous'}
+            value={numericDisplay(base.heteroStrength)}
+            onChange={(event) => set('heteroStrength', event.currentTarget.valueAsNumber)}
           />
         </div>
         <div className="field">
-          <label>分层数</label>
+          <label htmlFor="strata">分层数</label>
           <input
+            id="strata"
             type="number"
             step="1"
             min="2"
-            value={base.nStrata}
-            onChange={(e) => set('nStrata', Math.max(2, Number(e.target.value)))}
+            max={nLevels.length ? maximumStrata(nLevels) : undefined}
+            disabled={base.assignment === 'complete'}
+            value={numericDisplay(base.nStrata)}
+            onChange={(event) => set('nStrata', event.currentTarget.valueAsNumber)}
           />
         </div>
       </div>
@@ -209,13 +224,15 @@ export function ControlPanel(props: ControlPanelProps) {
       </div>
 
       <div className="field">
-        <label>蒙特卡洛试验次数</label>
+        <label htmlFor="trials">每组蒙特卡洛试验次数</label>
         <input
+          id="trials"
           type="number"
-          step="10"
-          min="10"
-          value={nTrials}
-          onChange={(e) => setNTrials(Math.max(10, Number(e.target.value)))}
+          step="1"
+          min={MIN_TRIALS}
+          max={MAX_TRIALS}
+          value={numericDisplay(nTrials)}
+          onChange={(event) => setNTrials(event.currentTarget.valueAsNumber)}
         />
         <div className="hint">默认 10 次便于快速演示；比较覆盖率时请增加重复次数，运行时间也会相应增长。</div>
       </div>
@@ -238,24 +255,23 @@ export function ControlPanel(props: ControlPanelProps) {
       </div>
 
       {running ? (
-        <button className="btn btn-ghost" onClick={onStop}>
-          停止
+        <button className="btn btn-ghost" type="button" onClick={onStop}>
+          停止实验
         </button>
       ) : (
-        <button className="btn btn-primary" onClick={onRun} disabled={!hasRunnableGrid}>
-          运行蒙特卡洛实验
-        </button>
-      )}
-
-      {!running && !hasRunnableGrid && (
-        <div className="hint">请至少选择一个样本量、一个维度和一个估计量。</div>
+        <>
+          <p id="run-check" className={runIssue ? 'run-check invalid' : 'run-check'}>
+            {runIssue || `${gridSize} 组参数 · ${estimators.length} 种估计量 · 共 ${gridSize * nTrials} 次试验`}
+          </p>
+          <button className="btn btn-primary" type="submit" disabled={Boolean(runIssue)} aria-describedby="run-check">
+            运行蒙特卡洛实验
+          </button>
+        </>
       )}
 
       {running && (
         <div className="progress-wrap">
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${pct}%` }} />
-          </div>
+          <progress className="progress-track" aria-label="已完成参数组数" value={progress.done} max={progress.total} />
           <div className="progress-text">
             <span>模拟中…</span>
             <span>
@@ -264,6 +280,6 @@ export function ControlPanel(props: ControlPanelProps) {
           </div>
         </div>
       )}
-    </div>
+    </form>
   );
 }

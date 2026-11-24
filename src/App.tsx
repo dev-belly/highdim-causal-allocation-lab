@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ControlPanel, type BaseParams } from './components/ControlPanel';
+import { ControlPanel } from './components/ControlPanel';
+import { designError, runParameters, type BaseParams } from './core/design';
 import {
   CoverageChart,
   RmseHeatmap,
@@ -23,6 +24,8 @@ const DEFAULT_BASE: BaseParams = {
   sparse: true,
 };
 
+const RUN_SEED = 42;
+
 export default function App() {
   const [base, setBase] = useState<BaseParams>(DEFAULT_BASE);
   const [nLevels, setNLevels] = useState<number[]>([200, 500]);
@@ -36,6 +39,7 @@ export default function App() {
   ]);
   const [selectedP, setSelectedP] = useState(5);
   const [selectedEstimator, setSelectedEstimator] = useState<EstimatorName>('lasso_adjusted');
+  const [trialsPerCell, setTrialsPerCell] = useState(0);
 
   const { progress, results, running, error, start, stop } = useSimulation();
 
@@ -43,19 +47,24 @@ export default function App() {
     ? [...new Set(results.map((c) => c.params.p))]
     : pLevels;
   const effP = psInResults.includes(selectedP) ? selectedP : psInResults[0] ?? selectedP;
-  const estsInResults = (
-    results.length ? (Object.keys(results[0].summary) as EstimatorName[]) : estimators
-  ) as EstimatorName[];
+  const estsInResults = results.length ? Object.keys(results[0].summary) as EstimatorName[] : estimators;
   const effEst = estsInResults.includes(selectedEstimator)
     ? selectedEstimator
     : estsInResults[0] ?? selectedEstimator;
 
-  const onRun = () => {
-    const grid: DGPParams[] = [];
-    for (const n of nLevels) for (const p of pLevels) grid.push({ ...base, n, p });
+  const runIssue = nLevels.length && pLevels.length && estimators.length
+    ? designError(base, nLevels, pLevels, nTrials)
+    : '请至少选择一个样本量、一个维度和一个估计量。';
+  const stage = running ? '运行中' : error ? '运行失败' : progress.done === progress.total ? '运行完成' : '已停止';
+
+  function onRun() {
+    if (running || runIssue) return;
+    const settings = runParameters(base);
+    const grid: DGPParams[] = nLevels.flatMap((n) => pLevels.map((p) => ({ ...settings, n, p })));
+    setTrialsPerCell(nTrials);
     setSelectedP(pLevels[0]);
-    start(grid, estimators, nTrials, 42);
-  };
+    start(grid, estimators, nTrials, RUN_SEED);
+  }
 
   return (
     <div className="app">
@@ -82,16 +91,27 @@ export default function App() {
           setEstimators={setEstimators}
           running={running}
           progress={progress}
+          runIssue={runIssue}
           onRun={onRun}
           onStop={stop}
         />
 
         <div>
-          {error && <div className="card error-card">{error}</div>}
+          {progress.total > 0 && (
+            <section className="card run-summary" aria-labelledby="run-heading">
+              <div>
+                <h2 id="run-heading">本次实验</h2>
+                <p role="status">{stage} · {progress.done} / {progress.total} 组完成</p>
+              </div>
+              <dl>
+                <div><dt>每组试验</dt><dd>{trialsPerCell}</dd></div>
+                <div><dt>随机种子</dt><dd>{RUN_SEED}</dd></div>
+              </dl>
+            </section>
+          )}
+          {error && <div className="card error-card" role="alert">{error}</div>}
           {results.length === 0 ? (
-            <div className="card empty">
-              设置左侧参数后点击“运行蒙特卡洛实验”，结果将在此实时呈现。
-            </div>
+            <div className="card empty">{running ? '正在计算首组结果…' : '完成的参数组将在这里显示。'}</div>
           ) : (
             <div className="charts">
               <div className="card">

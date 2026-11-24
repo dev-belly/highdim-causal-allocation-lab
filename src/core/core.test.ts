@@ -6,6 +6,7 @@ import { lassoFit } from './lasso';
 import { runTrial, aggregate, observedTreatedVariance } from './simulator';
 import { shaferStrimmerShrinkage, bayesSteinShrinkage } from './shrinkage';
 import { meanVarianceWeight, evaluateAllocation } from './portfolio';
+import { designError, MAX_TRIALS, runParameters } from './design';
 import type { DGPParams, EstimatorName } from './types';
 
 const base: DGPParams = {
@@ -29,6 +30,36 @@ const ESTIMATORS: EstimatorName[] = [
   'lasso_adjusted',
   'cross_fitting_dml',
 ];
+
+describe('浏览器实验参数边界', () => {
+  const error = (overrides: Partial<DGPParams>, trials = 10) =>
+    designError({ ...base, ...overrides }, [200, 500], [5, 20], trials);
+
+  it('区分有效的 0、空白以及无效试验次数', () => {
+    expect(error({ ate: 0, noiseSd: 0 })).toBe('');
+    expect(error({ ate: NaN })).toContain('ATE');
+    expect(error({ noiseSd: -0.1 })).toContain('噪声');
+    expect(error({}, 10.5)).toContain('整数');
+    expect(error({}, MAX_TRIALS + 1)).toContain(`${MAX_TRIALS}`);
+  });
+
+  it('用所选维度的最大协方差块计算相关边界', () => {
+    expect(error({ rho: -1 / 19 })).toContain('正定');
+    expect(error({ rho: -0.05 })).toBe('');
+    expect(error({ corrType: 'ar1', rho: -0.5 })).toBe('');
+    expect(error({ corrType: 'block', rho: -0.2 })).toBe('');
+    expect(error({ corrType: 'block', rho: -0.25 })).toContain('正定');
+  });
+
+  it('分层依据最小样本，未启用的参数不会阻止运行', () => {
+    expect(error({ nStrata: 100 })).toBe('');
+    expect(error({ nStrata: 101 })).toContain('100');
+    const inactive: DGPParams = { ...base, corrType: 'independent', rho: NaN,
+      assignment: 'complete', nStrata: NaN, heteroType: 'homogeneous', heteroStrength: NaN };
+    expect(error(inactive)).toBe('');
+    expect(runParameters(inactive)).toMatchObject({ rho: 0, nStrata: 2, heteroStrength: 0 });
+  });
+});
 
 describe('DGP 可复现性', () => {
   it('AR(1) 的负相关系数在奇数距离保留负号', () => {
